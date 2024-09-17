@@ -1,52 +1,56 @@
 library(telegram.bot)
 
-#BOT_TOKEN is in repository variable in github
-bot <- Bot(token = BOT_TOKEN)
+#Try to set in your repo secret variable for privacy
+bot_token <- "YOUR_BOT_TOKEN"
 
-#to handle messages
-handle_message <- function(bot, update) {
-  # Get the message text
-  user_input <- update$message$text
-  
-  #R code provided by the user
-  tryCatch({
-    # Evaluate the code
-    result <- eval(parse(text = user_input))
-    
-    # Check if a plot was generated
-    if (length(dev.list()) > 0) {
-      # If a plot is active, save it as a PNG
-      image_path <- tempfile(fileext = ".png")
-      png(image_path)
-      
-      # Re-execute the code to regenerate the plot in PNG format
-      eval(parse(text = user_input))
-      dev.off()
-      
-      # Send the image back to the user
-      bot$sendPhoto(chat_id = update$message$chat_id, photo = image_path)
-      
-      # Optionally, also send text output if any
-      result_str <- capture.output(print(result))
-      if (length(result_str) > 0) {
-        bot$sendMessage(chat_id = update$message$chat_id, text = paste(result_str, collapse = "\n"))
-      }
-    } else {
-      # If no plot is generated, just send the result as text
-      result_str <- capture.output(print(result))
-      bot$sendMessage(chat_id = update$message$chat_id, text = paste(result_str, collapse = "\n"))
-    }
-  }, error = function(e) {
-    # If there is an error, send the error message back to the user
-    bot$sendMessage(chat_id = update$message$chat_id, text = paste("Error:", e$message))
-  })
+bot <- Bot(token = bot_token)
+
+install_if_needed <- function(package_name) {
+  if (!require(package_name, character.only = TRUE)) {
+    install.packages(package_name, repos = "http://cran.us.r-project.org")
+    library(package_name, character.only = TRUE)
+  }
 }
 
-# Create the updater and dispatcher
-updater <- Updater(token = BOT_TOKEN)
+handle_message <- function(bot, update) {
+  user_input <- update$message$text
+  
+  if (grepl("^/install", user_input)) {
+    package_name <- sub("^/install ", "", user_input)
+    
+    tryCatch({
+      install_if_needed(package_name)
+      bot$sendMessage(chat_id = update$message$chat_id, text = paste("Package", package_name, "installed successfully!"))
+    }, error = function(e) {
+      bot$sendMessage(chat_id = update$message$chat_id, text = paste("Error installing package:", e$message))
+    })
+  } else {
+    tryCatch({
+      result <- eval(parse(text = user_input))
+      
+      if (length(dev.list()) > 0) {
+        image_path <- tempfile(fileext = ".png")
+        png(image_path)
+        eval(parse(text = user_input))
+        dev.off()
+        bot$sendPhoto(chat_id = update$message$chat_id, photo = image_path)
+        
+        result_str <- capture.output(print(result))
+        if (length(result_str) > 0) {
+          bot$sendMessage(chat_id = update$message$chat_id, text = paste(result_str, collapse = "\n"))
+        }
+      } else {
+        result_str <- capture.output(print(result))
+        bot$sendMessage(chat_id = update$message$chat_id, text = paste(result_str, collapse = "\n"))
+      }
+    }, error = function(e) {
+      bot$sendMessage(chat_id = update$message$chat_id, text = paste("Error:", e$message))
+    })
+  }
+}
 
-# Add the handler for messages
+updater <- Updater(token = bot_token)
+
 updater <- updater + MessageHandler(handle_message, MessageFilters$text)
 
-# Start the bot
 updater$start_polling()
