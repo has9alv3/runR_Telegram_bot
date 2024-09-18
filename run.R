@@ -1,9 +1,9 @@
 library(telegram.bot)
 
 #Try to set in your repo secret variable for privacy
-bot_token <- "YOUR_BOT_TOKEN"
+BOT_TOKEN <- "YOUR_BOT_TOKEN"
 
-bot <- Bot(token = bot_token)
+bot <- Bot(token = BOT_TOKEN)
 
 install_if_needed <- function(package_name) {
   if (!require(package_name, character.only = TRUE)) {
